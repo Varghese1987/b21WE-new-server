@@ -3,7 +3,13 @@ var router = express.Router();
 // var dotenv = require("dotenv");
 
 const { mongoClient } = require("../dbConfig");
-const { hashing, authorize, roleAuth } = require("../helper/auth");
+const {
+  hashing,
+  authorize,
+  roleAuth,
+  hashCompare,
+  createJWT,
+} = require("../helper/auth");
 
 const dbUrl = process.env.DB_URL;
 
@@ -34,7 +40,7 @@ router.post("/register", async (req, res) => {
 });
 
 // role vlues : {1:Admin,2:normal User}
-router.get("/users", async (req, res) => {
+router.get("/users", [authorize, roleAuth(1)], async (req, res) => {
   //open connection
   let client = await mongoClient.connect(dbUrl);
   try {
@@ -50,6 +56,37 @@ router.get("/users", async (req, res) => {
     //close connections
     client.close();
   }
+});
+
+// Login
+
+router.post("/login", async (req, res) => {
+  const client = await mongoClient.connect(dbUrl);
+  const { password, email } = req.body;
+  try {
+    // check the user
+    const db = client.db("b21WEDBNEW");
+    const user = await db.collection("users").findOne({ email });
+    if (user) {
+      // compare password
+      const compare = await hashCompare(password, user.password);
+      console.log("compare:::", compare);
+      if (compare) {
+        const token = await createJWT({
+          email,
+          _id: user._id,
+          role: user.role,
+        });
+        console.log("token", token);
+        res.json({ message: "allow access", token });
+      } else {
+        res.json({ message: "wrong password" });
+      }
+    } else {
+      res.json({ message: "No user Exists with this credentials" });
+    }
+    // send response
+  } catch (error) {}
 });
 
 module.exports = router;
