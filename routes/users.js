@@ -3,7 +3,7 @@ var router = express.Router();
 // var dotenv = require("dotenv");
 
 const { mongoClient } = require("../dbConfig");
-const { hashing } = require("../helper/auth");
+const { hashing, authorize, roleAuth } = require("../helper/auth");
 
 const dbUrl = process.env.DB_URL;
 
@@ -24,6 +24,25 @@ router.post("/register", async (req, res) => {
     req.body.password = hash;
     const data = await db.collection("users").insertOne(req.body);
     res.json({ message: "record Created" });
+  } catch (error) {
+    console.log(error);
+    res.json({ message: "Something Went wrong" });
+  } finally {
+    //close connections
+    client.close();
+  }
+});
+
+// role vlues : {1:Admin,2:normal User}
+router.get("/users", async (req, res) => {
+  //open connection
+  let client = await mongoClient.connect(dbUrl);
+  try {
+    //select the db
+    let db = client.db("b21WEDBNEW");
+    //select the collection and perform db operation
+    const data = await db.collection("users").find().toArray();
+    res.json({ message: "Success", data });
   } catch (error) {
     console.log(error);
     res.json({ message: "Something Went wrong" });
